@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.util.*;
 
@@ -10,7 +11,14 @@ public class Index {
         coverNodes=new HashSet<String>();
 
         GenerateCover(l);
+        indexes=new HashMap<String,List<IndexEntry>>();
         GenerateIndexes(l,indexes);
+        revIndexes=new HashMap<String,List<IndexEntry>>();
+        List<Edge> revEdges=new LinkedList<Edge>();
+        for(Edge e:l){
+            revEdges.add(new Edge(e.v,e.u,e.prob));
+        }
+        GenerateIndexes(revEdges,revIndexes);
     }
     void GenerateCover(List<Edge> l){
         for(Edge e:l){
@@ -21,7 +29,6 @@ public class Index {
         }
     }
     void GenerateIndexes(List<Edge> l, Map<String,List<IndexEntry>> index){
-        index=new HashMap<String,List<IndexEntry>>();
         for (Edge e:l){
             index.computeIfAbsent(e.u, k -> new LinkedList<IndexEntry>());
             index.computeIfAbsent(e.v, k -> new LinkedList<IndexEntry>());
@@ -30,6 +37,7 @@ public class Index {
         for(Edge e:l){
             Set<Edge> st = mp.computeIfAbsent(e.u, k -> new HashSet<Edge>());
             st.add(e);
+            mp.computeIfAbsent(e.v, k -> new HashSet<Edge>());
         }
 
         for(Map.Entry<String,List<IndexEntry>> entry:index.entrySet()){
@@ -52,7 +60,7 @@ public class Index {
                         q.offer(out.v);
                         dis.put(out.v,dis.get(now)+1);
                         if (coverNodes.contains(out.v)){
-                            index.get(out.v).add(new IndexEntry(out.v, dis.get(out.v),0));
+                            index.get(node).add(new IndexEntry(out.v, dis.get(out.v),0));
                         }
                     }
                 }
@@ -68,7 +76,7 @@ public class Index {
                         if (!visited.contains(out.v)){
                             double temp=Math.random();
                             if (temp<=out.prob){
-                                counter.put(out.v,counter.get(out.v)+1);
+                                counter.merge(out.v, 1, Integer::sum);
                                 visited.add(out.v);
                                 q.offer(out.v);
                             }
@@ -77,7 +85,7 @@ public class Index {
                 }
             }
             for(IndexEntry entry:index.get(node)){
-                if (!entry.v.equals(node)){
+                if (!entry.v.equals(node) && counter.containsKey(entry.v)){
                     entry.prob=(double)counter.get(entry.v)/K;
                 }
             }
@@ -93,15 +101,63 @@ public class Index {
                 }
             }
         }
-
+    }
+    int QueryDis(String u,String v){
+        if (coverNodes.contains(u) && coverNodes.contains(v)){
+            for(IndexEntry out:indexes.get(u)){
+                if (out.v.equals(v)){
+                    return out.dis;
+                }
+            }
+        } else if (!coverNodes.contains(u) && coverNodes.contains(v)) {
+            for(IndexEntry cv:indexes.get(u)){
+                for(IndexEntry out:indexes.get(cv.v)){
+                    if (out.v.equals(v)){
+                        return cv.dis+out.dis;
+                    }
+                }
+            }
+        } else if (coverNodes.contains(u) && !coverNodes.contains(v)) {
+            for(IndexEntry cv:revIndexes.get(v)){
+                for(IndexEntry out:revIndexes.get(cv.v)){
+                    if (out.v.equals(u)){
+                        return cv.dis+out.dis;
+                    }
+                }
+            }
+        } else if (!coverNodes.contains(u) && !coverNodes.contains(v)) {
+            for(IndexEntry cvu:indexes.get(u)){
+                for(IndexEntry cvv:revIndexes.get(v)){
+                    for(IndexEntry out:indexes.get(cvu.v)){
+                        if (out.v.equals(cvv.v)){
+                            return cvu.dis+cvv.dis+out.dis;
+                        }
+                    }
+                }
+            }
+        }
+        return -1;
     }
     public static void main(String[] args) throws Exception {
-        BufferedReader in = new BufferedReader(new FileReader("in.txt"));
-//        Scanner scan=in;
-        String str;
-        while ((str = in.readLine()) != null) {
-            System.out.println(str);
+        File f=new File("in.txt");
+        Scanner s=new Scanner(f);
+        List<Edge> l=new LinkedList<Edge>();
+        while (true){
+            try {
+                int u,v;
+                double p;
+                u=s.nextInt();
+                v=s.nextInt();
+                p=s.nextDouble();
+                Edge e=new Edge(Integer.toString(u),Integer.toString(v),p);
+                l.add(e);
+            }
+            catch (NoSuchElementException e){
+                break;
+            }
         }
-        System.out.println(str);
+        Index x=new Index();
+        x.Init(l);
+        System.out.println(x.QueryDis("1","6"));
     }
 }
